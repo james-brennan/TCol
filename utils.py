@@ -2,11 +2,17 @@ import os
 import glob
 import gdal
 import numpy as np
+from collections import namedtuple
+import json
 
 
-
-
-def loadFireCCIv5(year, tile, ymin, ymax, xmin, xmax):
+"""
+*-- IO stuff --*
+"""
+def loadFireCCIv50(year, tile, ymin, ymax, xmin, xmax):
+    """
+    *-- Load FireCCI50 --*
+    """
     ysize = ymax - ymin
     xsize = xmax - xmin
     fccidir = "/home/users/jbrennan01/DATA2/TColBA/input_products/fire_cci_v5/%s/" % tile
@@ -24,11 +30,9 @@ def loadFireCCIv5(year, tile, ymin, ymax, xmin, xmax):
     store = np.hstack(store)
     return store
 
-
-
-def loadFireCCI(year, tile, ymin, ymax, xmin, xmax):
+def loadFireCCI41(year, tile, ymin, ymax, xmin, xmax):
     """
-
+    *-- Load FireCCI41 --*
     """
     ysize = ymax - ymin
     xsize = xmax - xmin
@@ -95,26 +99,9 @@ def loadFireCCI(year, tile, ymin, ymax, xmin, xmax):
     return store
 
 
-def clean_up_tmpfiles(year, tile):
-    """
-    run this file at the end to remove the
-    tempoary rasters for the firecci product
-    """
-    for month in xrange(1, 13):
-        """
-        save it because we re-use it later...
-        """
-        tmpdir = '/home/users/jbrennan01/DATA2/TColBA/tmp/'
-        tmpfile = tmpdir + 'fcci_tmp_%02i_%i_%s.tif' % (month, year, tile)
-        if os.path.isfile(tmpfile):
-            # delete the file
-            pass
-        else:
-            pass
-
 def loadMCD45(year, tile, ymin, ymax, xmin, xmax):
     """
-
+    *-- Load MCd45 --*
     """
     ysize = ymax - ymin
     xsize = xmax - xmin
@@ -129,12 +116,11 @@ def loadMCD45(year, tile, ymin, ymax, xmin, xmax):
         store.append(burnt_m)
         F.append(mapB)
     store = np.hstack(store)
-    #import pdb; pdb.set_trace()
     return store, gdal.Open(tmp)
 
 def loadMCD64(year, tile,  ymin, ymax, xmin, xmax):
     """
-
+    *-- Load MCD64 --*
     """
     ysize = ymax - ymin
     xsize = xmax - xmin
@@ -153,31 +139,16 @@ def loadMCD64(year, tile,  ymin, ymax, xmin, xmax):
 
 
 
-def save_outputs(sigma_mcd64,
-                 sigma_mcd45,
-                 sigma_fcci,
-                 nObs,
-                _meanMCD64,
-                _meanMCD45,
-                _meanFCCI,
-                _stdMCD64,
-                _stdMCD45,
-                _stdFCCI,
-                _cMCD64_MCD45,
-                _cMCD64_FCCI,
-                _cMCD45_FCCI,
-                _meanMonth,
-                _meanSeason,
-                _stdSeason,
-                _sumMCD64,
-                _sumMCD45,
-                _sumFCCI,
-                int_nPxls, ds, tile):
+# the stuff we'd like to save...
+OutputsDataset = namedtuple("OutputsDatasets", ['sig_MCD64', 'sig_FCCI', 'sig_MCD45', 'start_year', 'end_year', 'tile', 'FireCCI50', 'nObs']  )
+
+def save_experiment(exp_name, output_tuple):
+    outdir = "/home/users/jbrennan01/DATA2/TCol2/outputs/" + exp_name + "/"
+    # stuff stores the outputs
+    os.mkdirs(outdir,exist_ok=True)
     """
-    save the grid products...
-    to mini-modis tiles for now
+    set up the output file
     """
-    outdir = '/home/users/jbrennan01/DATA2/TColBA/outputs/'
     mem_drv = gdal.GetDriverByName( 'GTIff' )
     # The size of the raster is given the new projection and pixel spacing
     # Using the values we calculated above. Also, setting it to store one band
@@ -186,7 +157,7 @@ def save_outputs(sigma_mcd64,
     int_nSize = int(2400/int_nPxls)
 
     dest = mem_drv.Create(outdir+'output_%s_%i.tif' % (tile, int_nPxls), int_nSize,
-                                 int_nSize, 19, gdal.GDT_Float32)
+                                 int_nSize, 4, gdal.GDT_Float32)
     # Calculate the new geotransform
     # Set the geotransform
     geo_t = list(ds.GetGeoTransform())
@@ -201,32 +172,41 @@ def save_outputs(sigma_mcd64,
     dest.GetRasterBand(2).WriteArray(sigma_mcd45)
     dest.GetRasterBand(3).WriteArray(sigma_fcci)
     dest.GetRasterBand(4).WriteArray(nObs)
-    dest.GetRasterBand(5).WriteArray(_cMCD64_MCD45)
-    dest.GetRasterBand(6).WriteArray(_cMCD64_FCCI)
-    dest.GetRasterBand(7).WriteArray(_cMCD45_FCCI)
-    dest.GetRasterBand(8).WriteArray(_meanMCD64)
-    dest.GetRasterBand(9).WriteArray(_meanMCD45)
-    dest.GetRasterBand(10).WriteArray(_meanFCCI)
-    dest.GetRasterBand(11).WriteArray(_stdMCD64)
-    dest.GetRasterBand(12).WriteArray(_stdMCD45)
-    dest.GetRasterBand(13).WriteArray(_stdFCCI)
-
-    dest.GetRasterBand(14).WriteArray(_meanMonth)
-    dest.GetRasterBand(15).WriteArray(_meanSeason)
-    dest.GetRasterBand(16).WriteArray(_stdSeason)
-
-    # and sum estimates
-
-    dest.GetRasterBand(17).WriteArray(_sumMCD64)
-    dest.GetRasterBand(18).WriteArray(_sumMCD45)
-    dest.GetRasterBand(19).WriteArray(_sumFCCI)
 
     # set nodata
-    for b in xrange(1, 20):
+    for b in xrange(1, 4):
         band = dest.GetRasterBand(b)
         band.SetNoDataValue(-999)
-
-
-    dest.FlushCache()  # Write to disk.
+    # Write to disk.
+    dest.FlushCache()
     dest = None
+    """
+    make a file to save experiment stuff
+    """
+    options_dict = { 'start_year':start_year,
+                     'end_year':start_year,
+                     'FireCCI50':FireCCI50,
+                     'Nx':N,}
+    # save these
+    with open(outdir+'exp_name.txt', 'w') as file:
+        file.write(json.dumps(options_dict))
 
+"""
+*-- Other utilities --*
+"""
+def clean_up_tmpfiles(year, tile):
+    """
+    run this file at the end to remove the
+    tempoary rasters for the firecci product
+    """
+    for month in xrange(1, 13):
+        """
+        save it because we re-use it later...
+        """
+        tmpdir = '/home/users/jbrennan01/DATA2/TColBA/tmp/'
+        tmpfile = tmpdir + 'fcci_tmp_%02i_%i_%s.tif' % (month, year, tile)
+        if os.path.isfile(tmpfile):
+            # delete the file
+            pass
+        else:
+            pass
