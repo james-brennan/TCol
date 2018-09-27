@@ -57,6 +57,7 @@ def loadFireCCI41(year, tile, ymin, ymax, xmin, xmax):
         """
         tmpdir = '/home/users/jbrennan01/DATA2/TColBA/tmp/'
         tmpfile = tmpdir + 'fcci_tmp_%02i_%i_%s.tif' % (month, year, tile)
+        print tile, os.path.isfile(tmpfile)
         if not os.path.isfile(tmpfile):
             """
             want to produce a modis style intermediate product...
@@ -140,12 +141,13 @@ def loadMCD64(year, tile,  ymin, ymax, xmin, xmax):
 
 
 # the stuff we'd like to save...
-OutputsDataset = namedtuple("OutputsDatasets", ['sig_MCD64', 'sig_FCCI', 'sig_MCD45', 'start_year', 'end_year', 'tile', 'FireCCI50', 'nObs']  )
+OutputDataset = namedtuple("OutputDataset", ['sig_MCD64', 'sig_FCCI', 'sig_MCD45', 'start_year', 'end_year', 'tile', 'FireCCI50', 'nObs']  )
 
-def save_experiment(exp_name, output_tuple):
+def save_experiment(exp_name, output_tuple, tile, tile_ds):
     outdir = "/home/users/jbrennan01/DATA2/TCol2/outputs/" + exp_name + "/"
     # stuff stores the outputs
-    os.mkdirs(outdir,exist_ok=True)
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
     """
     set up the output file
     """
@@ -154,24 +156,24 @@ def save_experiment(exp_name, output_tuple):
     # Using the values we calculated above. Also, setting it to store one band
     # and to use Float32 data type.
 
-    int_nSize = int(2400/int_nPxls)
-
+    int_nSize = output_tuple.sig_MCD64.shape[0]
+    int_nPxls =  int(2400/int_nSize)
     dest = mem_drv.Create(outdir+'output_%s_%i.tif' % (tile, int_nPxls), int_nSize,
                                  int_nSize, 4, gdal.GDT_Float32)
     # Calculate the new geotransform
     # Set the geotransform
-    geo_t = list(ds.GetGeoTransform())
+    geo_t = list(tile_ds.GetGeoTransform())
     # do pixel re-sizing
     geo_t[1] =  (geo_t[1] * 2400.0) / int_nSize
     geo_t[-1] =  (geo_t[-1] * 2400.0) / int_nSize
     geo_t = tuple(geo_t)
     dest.SetGeoTransform( geo_t )
-    dest.SetProjection ( ds.GetProjectionRef() )
+    dest.SetProjection ( tile_ds.GetProjectionRef() )
     # and write
-    dest.GetRasterBand(1).WriteArray(sigma_mcd64)
-    dest.GetRasterBand(2).WriteArray(sigma_mcd45)
-    dest.GetRasterBand(3).WriteArray(sigma_fcci)
-    dest.GetRasterBand(4).WriteArray(nObs)
+    dest.GetRasterBand(1).WriteArray(output_tuple.sig_MCD64)
+    dest.GetRasterBand(2).WriteArray(output_tuple.sig_MCD45)
+    dest.GetRasterBand(3).WriteArray(output_tuple.sig_FCCI)
+    dest.GetRasterBand(4).WriteArray(output_tuple.nObs)
 
     # set nodata
     for b in xrange(1, 4):
@@ -183,13 +185,15 @@ def save_experiment(exp_name, output_tuple):
     """
     make a file to save experiment stuff
     """
-    options_dict = { 'start_year':start_year,
-                     'end_year':start_year,
-                     'FireCCI50':FireCCI50,
-                     'Nx':N,}
+    options_dict = { 'start_year': output_tuple.start_year,
+                     'end_year':   output_tuple.end_year,
+                     'FireCCI50': output_tuple.FireCCI50,
+                     'Nx': int_nPxls,}
     # save these
-    with open(outdir+'exp_name.txt', 'w') as file:
+    with open(outdir+'%s.txt' % exp_name, 'w') as file:
         file.write(json.dumps(options_dict))
+
+
 
 """
 *-- Other utilities --*

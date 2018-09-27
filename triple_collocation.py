@@ -94,6 +94,15 @@ def do_TriCol(tile, N=240, start_year=2005, end_year=2012, fireCCI5=True):
     else:
         loadFireCCI = loadFireCCI41
 
+
+    """
+    I think loading the products into
+    memory won't take too much space?
+    """
+    mcd45_ = []
+
+
+
     for i, x0 in enumerate(xrange(0, 2400, N)):
         for j, y0 in enumerate(xrange(0, 2400, N)):
             x1 = x0 + N
@@ -114,6 +123,7 @@ def do_TriCol(tile, N=240, start_year=2005, end_year=2012, fireCCI5=True):
                 run function to get each product and BA field
                 for the whole tile
                 """
+                #import pdb; pdb.set_trace()
                 mcd45_, ds = loadMCD45(year, tile, ymin, ymax, xmin, xmax)
                 mcd64_ = loadMCD64(year, tile, ymin, ymax, xmin, xmax)
                 fcci_ = loadFireCCI(year, tile, ymin, ymax, xmin, xmax)
@@ -137,8 +147,8 @@ def do_TriCol(tile, N=240, start_year=2005, end_year=2012, fireCCI5=True):
                 """
                 Do the actual calculation
                 """
-                (   _sigmas,
-                    _nObs) = triple_collocation(mcd64, mcd45, fcci, dates)
+                #import pdb; pdb.set_trace()
+                _sigmas, _nObs= triple_collocation(mcd64, mcd45, fcci, dates)
                 #print _sigmas
                 #import pdb; pdb.set_trace()
                 _sigMCD64 = _sigmas[0]
@@ -153,15 +163,13 @@ def do_TriCol(tile, N=240, start_year=2005, end_year=2012, fireCCI5=True):
                 nObs[j, i]          =  _nObs
             except:
                 pass
-    out = OutputsDataset(  sig_MCD64=sig_MCD64,
+    out = OutputDataset(  sig_MCD64=sig_MCD64,
                     sig_FCCI=sig_FCCI,
                     sig_MCD45=sig_MCD45,
                     start_year=start_year,
                     end_year=end_year,
                     tile=tile,
                     FireCCI50=fireCCI5,
-                    nObs=nObs)
-
-
+                    nObs=nObs) 
     # make an output dataset for this
-    return out
+    return out, ds
