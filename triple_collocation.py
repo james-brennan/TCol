@@ -170,6 +170,6 @@ def do_TriCol(tile, N=240, start_year=2005, end_year=2012, fireCCI5=True):
                     end_year=end_year,
                     tile=tile,
                     FireCCI50=fireCCI5,
-                    nObs=nObs) 
+                    nObs=nObs)
     # make an output dataset for this
     return out, ds

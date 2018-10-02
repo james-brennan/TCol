@@ -6,6 +6,20 @@ from collections import namedtuple
 import json
 
 
+import glob
+
+
+def load_CMG(product, tile, N=120 ):
+    dirr = '/home/users/jbrennan01/DATA2/TCol2/CMG_products/%s/' % product
+    filee = dirr + "MCD45_120_%.tif" % (product, N,tile)
+    return  gdal.Open(filee)
+
+
+
+
+
+
+
 """
 *-- IO stuff --*
 """
@@ -57,7 +71,6 @@ def loadFireCCI41(year, tile, ymin, ymax, xmin, xmax):
         """
         tmpdir = '/home/users/jbrennan01/DATA2/TColBA/tmp/'
         tmpfile = tmpdir + 'fcci_tmp_%02i_%i_%s.tif' % (month, year, tile)
-        print tile, os.path.isfile(tmpfile)
         if not os.path.isfile(tmpfile):
             """
             want to produce a modis style intermediate product...
